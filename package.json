@@ -1,0 +1,20 @@
+{
+  "name": "saaspass",
+  "version": "0.1.0",
+  "description": "SaasPass REST API client",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "otp",
+    "2fa",
+    "two-factor",
+    "authentication"
+  ],
+  "author": "Mokhtar Naamani <mokhtar.naamani@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "request": "^2.58.0"
+  }
+}
