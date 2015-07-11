@@ -1,7 +1,7 @@
 {
-  "name": "saaspass",
+  "name": "saaspass-client",
   "version": "0.1.0",
-  "description": "SaasPass REST API client",
+  "description": "SAASPASS REST API client",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -12,8 +12,11 @@
     "two-factor",
     "authentication"
   ],
-  "author": "Mokhtar Naamani <mokhtar.naamani@gmail.com>",
-  "license": "ISC",
+  "author": {
+    "name": "Mokhtar Naamani",
+    "email": "mokhtar.naamani@gmail.com",
+    "url": "https://github.com/mnaamani"
+  },
   "dependencies": {
     "request": "^2.58.0"
   }

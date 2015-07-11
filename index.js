@@ -21,11 +21,15 @@ function SaasPass(options) {
   var proto = this;
 
   //authenticate our application with SaasPass and get a new token
-  sp.authenticate = function(password, callback) {    
+  //will throw an error if password is not provided
+  //callback is optional
+  sp.authenticate = function(password, callback) {
     if (password == null) {
-      return callback(new Error("Password required"));
+      throw new Error("Password required");
     }
-    
+
+    callback = callback || function(){};
+
     request({
       baseUrl: apiBaseUrl,
       url: '/tokens',
@@ -33,17 +37,22 @@ function SaasPass(options) {
         password: password
       }
     }, function(error, response, body) {
-       if(!error && response.statusCode === 200) {
+       if(error || response.statusCode === 500) return callback(error || new Error("500 Server error"));
+       if(response.statusCode === 200) {
          //successfully authenticated
          apiToken = JSON.parse(body).token;
          callback(null, apiToken);
        } else {
-         callback(error || proto.apiError(response));
+         callback(proto.apiError(response));
        }
     });
   };
 
-  sp.checkOtp = function(username, otp, callback) {
+  sp.OTP = {};
+  sp.OTP.verify = function(username, otp, callback) {
+    if(typeof callback !== 'function') {
+      throw new Error("Callback function required");
+    }
     if(!apiToken) {
       return callback(new Error("checkOtp requires authentication"));
     }
@@ -53,6 +62,7 @@ function SaasPass(options) {
     if(otp == null) {
       return callback(new Error("OTP required"));
     }
+
     request({
       baseUrl: apiBaseUrl,
       url: '/otpchecks',
@@ -62,15 +72,119 @@ function SaasPass(options) {
         token: apiToken
       }
     }, function (error, response, body) {
-      if (!error && response.statusCode == 200) {
-	callback(null, true);
+      if(error || response.statusCode === 500) return callback(error || new Error("500 Server error"));
+      if (response.statusCode == 200) {
+          callback(null, true);
       } else {
-        callback(error || proto.apiError(response));
+        callback(proto.apiError(response));
       }
     });
   };
 
-  return sp;  
+  sp.INSTANT = {};
+  sp.INSTANT.getBarcodes = function(type, sessionId, callback) {
+    if(typeof callback !== 'function') {
+      throw new Error("Callback function required");
+    }
+    if(!apiToken) {
+      return callback(new Error("getBarcodeImage requires authentication"));
+    }
+    //valid instant login/registration strategies
+    if(["IL","BT","ILBT", "IR", "ILIR"].indexOf(type) == -1){
+        return callback(new Error("Invalid login strategy type"));
+    }
+    if(sessionId == null) {
+      return callback(new Error("session required"));
+    }
+
+    request({
+      baseUrl: apiBaseUrl,
+      url: '/barcodes',
+      qs: {
+        session: sessionId,
+        type: type,
+        token: apiToken
+      }
+    }, function (error, response, body) {
+      if(error || response.statusCode === 500) return callback(error || new Error("500 Server error"));
+      if (response.statusCode == 200) {
+          callback(null, JSON.parse(body));
+      } else {
+        callback(proto.apiError(response));
+      }
+    });
+  };
+
+  //custom apps will receive instant login notification as post request
+  //containing username, tracker, and the sessionId
+  //this method verifies that the notification is valid
+  sp.TRACKER = {};
+  sp.TRACKER.verify = function(username, tracker, sessionId, callback) {
+    if(!username || !tracker) {
+      return callback(new Error("Invalid tracker request"));
+    }
+
+    request({
+      baseUrl: apiBaseUrl,
+      url: '/trackers/' + tracker,
+      qs: {
+        account: username,
+        token: apiToken
+      }
+    }, function (error, response, body) {
+      if(error || response.statusCode === 500) return callback(error || new Error("500 Server error"));
+      if (response.statusCode == 200) {
+          callback(null, {
+            account: username,
+            session: sessionId //if SSO or Widget was used to login this will be undefined
+          });
+      } else {
+        callback(proto.apiError(response));
+      }
+    });
+  };
+
+  //handle POST requests with tracker information which can come from two
+  //sources
+  //1. SAASPASS servers - if displaying barcode on custom login page
+  //2. Through the browser by the SAASPASS login Widget
+  sp.TRACKER.handleRequest = function(request, callback) {
+    if(!request || !request.body) {
+      return callback(new Error("Empty request"));
+    }
+
+    var info;
+
+    //if req.body is not already parsed json
+    if(typeof request.body === "string") {
+      try{
+        info = JSON.parse(request.body);
+      } catch(e){
+        //callback with error
+        return callback(new Error("Error parsing request body"));
+      }
+    } else {
+      info = request.body;
+    }
+
+    if(info.session) {
+      //POST request from SAASPASS servers
+      sp.TRACKER.verify(info.username, info.tracker, info.session, callback);
+    } else {
+      //POST request from the user's browser
+      sp.TRACKER.verify(info.account, info.code, undefined, callback);
+    }
+  };
+
+  sp.SSO = {};
+  //handle GET request when user lands onto SSO endpoint coming from SAASPASS SSO Login page
+  sp.SSO.handleRequest = function(request, callback) {
+    var account = request.params.account;
+    var tracker = request.params.tracker;
+    sp.TRACKER.verify(account, tracker, undefined, callback);
+  };
+
+  return sp;
 }
 
 //create an Error object from the api error information in the response body
@@ -84,6 +198,5 @@ SaasPass.prototype.apiError = function(response) {
   } catch(e) {}
   return err;
 };
-
 
 module.exports = SaasPass;
