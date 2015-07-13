@@ -16,4 +16,4 @@ This is a work in progress to build an npm module to interface with [SAASPASS](h
 
 ### Examples
 
-See [sasspass-examples](https://github.com/mnaamani/saaspass-examples)
+See [saaspass-examples](https://github.com/mnaamani/saaspass-examples)
