@@ -153,34 +153,27 @@ function SaasPass(options) {
       return callback(new Error("Empty request"));
     }
 
-    var info;
-
-    //if req.body is not already parsed json
-    if(typeof request.body === "string") {
-      try{
-        info = JSON.parse(request.body);
-      } catch(e){
-        //callback with error
-        return callback(new Error("Error parsing request body"));
-      }
-    } else {
-      info = request.body;
+    if(typeof request.body === 'string') {
+      //request should have been parsed by express using body-parser middleware
+      return callback(new Error("Reuest not parsed"));
     }
+
+    var info = request.body;
 
     if(info.session) {
       //POST request from SAASPASS servers
       sp.TRACKER.verify(info.username, info.tracker, info.session, callback);
     } else {
-      //POST request from the user's browser
+      //POST request from the user's browser (from widgets)
       sp.TRACKER.verify(info.account, info.code, undefined, callback);
     }
   };
 
   sp.SSO = {};
-  //handle GET request when user lands onto SSO endpoint coming from SAASPASS SSO Login page
+  //handle GET request when user lands on SSO endpoint coming from SAASPASS SSO Login page
   sp.SSO.handleRequest = function(request, callback) {
-    var account = request.params.account;
-    var tracker = request.params.tracker;
+    var account = request.query.account;
+    var tracker = request.query.tracker;
     sp.TRACKER.verify(account, tracker, undefined, callback);
   };
 
